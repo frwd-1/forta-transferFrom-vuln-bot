@@ -7,7 +7,7 @@ import {
 } from "forta-agent";
 
 export const ERC20_TRANSFERFROM_SIGNATURE =
-  "function transferFrom(address,address,uint256)";
+  "event transferFrom(address from, address to, uint256 amount)";
 
 let findingsCount = 0;
 
@@ -16,12 +16,10 @@ const handleTransaction: HandleTransaction = async (
 ) => {
   const findings: Finding[] = [];
 
-  const transferFromCalls = txEvent.filterFunction(
-    ERC20_TRANSFERFROM_SIGNATURE
-  );
+  const transferFromCalls = txEvent.filterLog(ERC20_TRANSFERFROM_SIGNATURE);
+  console.log("transferFromCalls:", transferFromCalls);
 
   transferFromCalls.forEach((call) => {
-    // Normalize addresses and provide fallback for null values
     const fromAddressNormalized = call.args.from
       ? call.args.from.toLowerCase()
       : "N/A";
@@ -29,6 +27,10 @@ const handleTransaction: HandleTransaction = async (
       ? txEvent.from.toLowerCase()
       : "N/A";
     const toAddressNormalized = txEvent.to ? txEvent.to.toLowerCase() : "N/A";
+
+    console.log("Detected transferFrom call");
+    console.log("Message Sender:", txSenderNormalized);
+    console.log("From parameter:", fromAddressNormalized);
 
     if (
       txSenderNormalized !== fromAddressNormalized &&
