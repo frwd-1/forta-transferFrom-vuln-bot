@@ -1,21 +1,14 @@
 import {
-  BlockEvent,
   Finding,
-  Initialize,
-  HandleBlock,
-  HealthCheck,
-  HandleTransaction,
-  HandleAlert,
-  AlertEvent,
-  TransactionEvent,
   FindingSeverity,
   FindingType,
+  HandleTransaction,
+  TransactionEvent,
 } from "forta-agent";
 
-export const ERC20_TRANSFER_EVENT =
-  "event Transfer(address indexed from, address indexed to, uint256 value)";
-export const TETHER_ADDRESS = "0xdAC17F958D2ee523a2206206994597C13D831ec7";
-export const TETHER_DECIMALS = 6;
+export const ERC20_TRANSFERFROM_SIGNATURE =
+  "function transferFrom(address,address,uint256)";
+
 let findingsCount = 0;
 
 const handleTransaction: HandleTransaction = async (
@@ -23,33 +16,36 @@ const handleTransaction: HandleTransaction = async (
 ) => {
   const findings: Finding[] = [];
 
-  // limiting this agent to emit only 5 findings so that the alert feed is not spammed
-  if (findingsCount >= 5) return findings;
-
-  // filter the transaction logs for Tether transfer events
-  const tetherTransferEvents = txEvent.filterLog(
-    ERC20_TRANSFER_EVENT,
-    TETHER_ADDRESS
+  const transferFromCalls = txEvent.filterFunction(
+    ERC20_TRANSFERFROM_SIGNATURE
   );
 
-  tetherTransferEvents.forEach((transferEvent) => {
-    // extract transfer event arguments
-    const { to, from, value } = transferEvent.args;
-    // shift decimals of transfer value
-    const normalizedValue = value.div(10 ** TETHER_DECIMALS);
+  transferFromCalls.forEach((call) => {
+    // Normalize addresses and provide fallback for null values
+    const fromAddressNormalized = call.args.from
+      ? call.args.from.toLowerCase()
+      : "N/A";
+    const txSenderNormalized = txEvent.from
+      ? txEvent.from.toLowerCase()
+      : "N/A";
+    const toAddressNormalized = txEvent.to ? txEvent.to.toLowerCase() : "N/A";
 
-    // if more than 10,000 Tether were transferred, report it
-    if (normalizedValue.gt(10000)) {
+    if (
+      txSenderNormalized !== fromAddressNormalized &&
+      txSenderNormalized !== "N/A" &&
+      fromAddressNormalized !== "N/A"
+    ) {
       findings.push(
         Finding.fromObject({
-          name: "High Tether Transfer",
-          description: `High amount of USDT transferred: ${normalizedValue}`,
-          alertId: "FORTA-1",
-          severity: FindingSeverity.Low,
-          type: FindingType.Info,
+          name: "Suspicious transferFrom Call",
+          description: `transferFrom called by different msg.sender: ${txSenderNormalized}`,
+          alertId: "FORTA-2",
+          severity: FindingSeverity.High,
+          type: FindingType.Suspicious,
           metadata: {
-            to,
-            from,
+            from: fromAddressNormalized,
+            messageSender: txSenderNormalized,
+            interactedWith: toAddressNormalized,
           },
         })
       );
@@ -60,33 +56,6 @@ const handleTransaction: HandleTransaction = async (
   return findings;
 };
 
-// const initialize: Initialize = async () => {
-//   // do some initialization on startup e.g. fetch data
-// }
-
-// const handleBlock: HandleBlock = async (blockEvent: BlockEvent) => {
-//   const findings: Finding[] = [];
-//   // detect some block condition
-//   return findings;
-// }
-
-// const handleAlert: HandleAlert = async (alertEvent: AlertEvent) => {
-//   const findings: Finding[] = [];
-//   // detect some alert condition
-//   return findings;
-// }
-
-// const healthCheck: HealthCheck = async () => {
-//   const errors: string[] = [];
-  // detect some health check condition
-  // errors.push("not healthy due to some condition")
-  // return errors;
-// }
-
 export default {
-  // initialize,
   handleTransaction,
-  // healthCheck,
-  // handleBlock,
-  // handleAlert
 };

@@ -32,6 +32,7 @@
     "test": "jest"
   },
   "dependencies": {
+    "ethers": "^6.10.0",
     "forta-agent": "^0.1.48"
   },
   "devDependencies": {
